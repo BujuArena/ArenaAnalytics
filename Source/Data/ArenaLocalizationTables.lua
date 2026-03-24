@@ -72,7 +72,7 @@ function Localization:GetSpecID(classToken, spec)
         return nil;
     end
 
-    if(not classToken or not spec or spec == "") then
+    if(not classToken or API:IsSecretValue(spec) or spec == "") then
         return nil;
     end
 

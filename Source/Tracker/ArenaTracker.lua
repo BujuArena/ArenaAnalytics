@@ -489,20 +489,38 @@ function ArenaTracker:ProcessCombatLogEvent(...)
 	end
 
 	-- Tracking teams for spec/race and in case arena is quitted
-	local timestamp,logEventType,_,sourceGUID,_,_,_,destGUID,_,_,_,spellID,spellName = CombatLogGetCurrentEventInfo();
+	-- destFlags (pos 10) identifies player type via COMBATLOG_OBJECT_TYPE_PLAYER (0x00000400),
+	-- which works even in Midnight where destGUID and destName may be secret values.
+	local timestamp,logEventType,_,sourceGUID,_,_,_,destGUID,destName,destFlags,_,spellID,spellName = CombatLogGetCurrentEventInfo();
+
+	-- record UNIT_DIED/PARTY_KILL events during shuffle into DevData for offline review
+	--if(ArenaTracker:IsTrackingShuffle() and (logEventType == "UNIT_DIED" or logEventType == "PARTY_KILL")) then
+	--	local function safeStr(v)
+	--		if v == nil then return "nil" end
+	--		if API:IsSecretValue(v) then return "SECRET" end
+	--		return tostring(v)
+	--	end
+	--	local playerFlagSet = (destFlags ~= nil and not API:IsSecretValue(destFlags)) and bit.band(destFlags, 0x00000400) ~= 0 or false;
+	--	Debug:Log(logEventType, "| GUID:", safeStr(destGUID), "| name:", safeStr(destName), "| flags:", safeStr(destFlags), "| playerBit:", tostring(playerFlagSet));
+	--	local log = ArenaAnalyticsDevData and ArenaAnalyticsDevData.shuffleDebugLog;
+	--	if(log and log.events) then
+	--		tinsert(log.events, {e=logEventType, guid=safeStr(destGUID), name=safeStr(destName), flags=safeStr(destFlags), playerBit=playerFlagSet});
+	--	end
+	--end
+
 	if (logEventType == "SPELL_CAST_SUCCESS") then
 		ArenaTracker:DetectSpec(sourceGUID, spellID, spellName);
 		ArenaTracker:TryRemoveFromDeaths(sourceGUID, spellName);
 	elseif(logEventType == "SPELL_AURA_APPLIED" or logEventType == "SPELL_AURA_REMOVED") then
 		ArenaTracker:DetectSpec(sourceGUID, spellID, spellName);
-	elseif(destGUID and destGUID:find("Player-", 1, true)) then
+	elseif(destFlags and bit.band(destFlags, 0x00000400) ~= 0) then
 		-- Player Death
 		if (logEventType == "UNIT_DIED") then
-			ArenaTracker:HandlePlayerDeath(destGUID, false);
+			ArenaTracker:HandlePlayerDeath(destGUID, false, destName);
 		end
 		-- Player killed
 		if (logEventType == "PARTY_KILL") then
-			ArenaTracker:HandlePlayerDeath(destGUID, true);
+			ArenaTracker:HandlePlayerDeath(destGUID, true, destName);
 		end
 	end
 end

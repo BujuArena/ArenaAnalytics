@@ -52,6 +52,8 @@ function ArenaTracker:HandleArenaEnd()
 
 	Debug:LogGreen("HandleArenaEnd!", #currentArena.players, currentArena.startTime, currentArena.endTime, GetNumBattlefieldScores());
 
+	ArenaTracker:StopEnemyDeathPoll();
+
 	-- Solo Shuffle
 	ArenaTracker:HandleRoundEnd(true);
 

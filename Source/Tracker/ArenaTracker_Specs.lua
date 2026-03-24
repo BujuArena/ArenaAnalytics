@@ -12,8 +12,12 @@ local Debug = ArenaAnalytics.Debug;
 -------------------------------------------------------------------------
 
 local currentArena = {};
+local wasInPreparation = false;
 function ArenaTracker:InitializeSubmodule_Specs()
     currentArena = ArenaAnalyticsTransientDB.currentArena;
+    -- Sync prep state from current aura, so a UI reload during preparation doesn't miss the
+    -- gates-open signal (aura removal would otherwise see wasInPreparation=false and skip).
+    wasInPreparation = API:IsArenaPreparation() and true or false;
 end
 
 
@@ -24,16 +28,31 @@ end
 
 
 function ArenaTracker:ProcessUnitAuraEvent(...)
-	-- Excludes versions without spell detection included
-	if(not SpecSpells or not SpecSpells.GetSpec) then
-		return;
-	end
-
 	if (not API:IsInArena()) then
 		return;
 	end
 
 	local unitTarget, updateInfo = ...;
+
+	-- Detect preparation aura removal as round-start signal for Solo Shuffle.
+	-- Uses state-diff via IsArenaPreparation() since aura.spellId may be a secret value
+	-- and Midnight uses removedAuraInstanceIDs instead of removedAuras.
+	-- API.explicitPreparationID = { 32727 } in Midnight prevents false positives from other spells.
+	if(unitTarget == "player" and ArenaTracker:IsTrackingShuffle() and ArenaTracker:IsTrackingArena()) then
+		local isInPrep = API:IsArenaPreparation() and true or false;
+		if(wasInPreparation and not isInPrep) then
+			wasInPreparation = false; -- Set before call so errors inside don't leave it stuck true
+			ArenaTracker:HandleArenaGatesOpened();
+		else
+			wasInPreparation = isInPrep;
+		end
+	end
+
+	-- Excludes versions without spell detection included
+	if(not SpecSpells or not SpecSpells.GetSpec) then
+		return;
+	end
+
 	if(not updateInfo or updateInfo.isFullUpdate) then
 		return;
 	end

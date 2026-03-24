@@ -30,6 +30,9 @@ end
 
 
 function Helpers:SanitizeValue(value)
+    if(API:IsSecretValue(value)) then
+        return nil;
+    end
     if(type(value) == "string") then
         value = value:gsub(" ", ""):lower();
     end
@@ -283,6 +286,7 @@ end
 
 
 function Helpers:UnitGUID(...)
-    local GUID = UnitGUID(...);
+    local ok, GUID = pcall(UnitGUID, ...);
+    if(not ok) then return nil; end
     return API:IsValidValue(GUID) and GUID or nil;
 end

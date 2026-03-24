@@ -197,6 +197,10 @@ function Events:HandleArenaEvent(event, ...)
 		local msg = ...;
 		ArenaTracker:HandleArenaMessages(msg);
 
+	elseif(event == "UNIT_HEALTH") then
+		local unit = ...;
+		ArenaTracker:HandleUnitHealth(unit);
+
 	elseif(event == "INSPECT_READY") then
 		if(API.enableInspection and Inspection and Inspection.HandleInspectReady) then
 			Debug:Log(event, "triggered!");
@@ -266,11 +270,14 @@ end
 -- Adds events used inside arenas
 function Events:RegisterArenaEvents()
 	registerEvents(eventFrames.arenaEventFrame, arenaEvents, Events.HandleArenaEvent);
+	-- UNIT_DIED doesn't fire via combat log in Midnight; use UNIT_HEALTH on known tokens instead
+	eventFrames.arenaEventFrame:RegisterUnitEvent("UNIT_HEALTH", "player", "party1", "party2", "arena1", "arena2", "arena3");
 end
 
 -- Removes events used inside arenas
 function Events:UnregisterArenaEvents()
 	unregisterEvents(eventFrames.arenaEventFrame, arenaEvents);
+	eventFrames.arenaEventFrame:UnregisterEvent("UNIT_HEALTH");
 end
 
 -------------------------------------------------------------------------

@@ -124,7 +124,7 @@ end
 
 
 function API:ToFullName(name)
-    if(not name) then
+    if(not name or API:IsSecretValue(name)) then
         return nil;
     end
 

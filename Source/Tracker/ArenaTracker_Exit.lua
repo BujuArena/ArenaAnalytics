@@ -144,6 +144,8 @@ function ArenaTracker:HandleArenaExit()
 
 	Debug:LogGreen("HandleArenaExit!     ", API:GetSeasonPlayed(currentArena.bracketIndex), currentArena.seasonPlayed);
 
+	ArenaTracker:StopEnemyDeathPoll();
+
 	if(Inspection and Inspection.Clear) then
 		Inspection:Clear();
 	end

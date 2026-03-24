@@ -544,7 +544,7 @@ local function CombineStatsText(total, wins, losses, draws)
     total = tonumber(total) or 0;
     wins = tonumber(wins) or 0;
 
-    local winrateText = Helpers:GetSafePercentage(wins, total);
+    local winrateText = Helpers:GetSafePercentage(wins, wins + (tonumber(losses) or 0));
     local winsText =  Colors:ColorText(wins, Colors.winColor);
     local lossesText = Colors:ColorText(losses, Colors.lossColor);
 
@@ -754,6 +754,21 @@ function AAtable:RefreshLayout()
             if(matchType == "rated") then
                 local rating = ArenaMatch:GetPartyRating(match);
                 local ratingDelta = ArenaMatch:GetPartyRatingDelta(match);
+                -- Fall back to self player's per-player rated info when match-level delta is missing.
+                -- Note: for Solo Shuffle in Midnight, scoreInfo.rating is the pre-match rating,
+                -- so the post-match rating must be computed as selfRating + selfDelta.
+                if(not ratingDelta) then
+                    local selfPlayer = ArenaMatch:GetSelf(match, true);
+                    if(selfPlayer) then
+                        local selfRating, selfDelta = ArenaMatch:GetPlayerRatedInfo(selfPlayer);
+                        if(selfRating and selfDelta) then
+                            rating = selfRating + selfDelta;
+                        else
+                            rating = rating or selfRating;
+                        end
+                        ratingDelta = selfDelta;
+                    end
+                end
                 ratingText = Helpers:RatingToText(rating, ratingDelta) or "-";
             elseif(matchType == "skirmish") then
                 ratingText = "SKIRMISH";

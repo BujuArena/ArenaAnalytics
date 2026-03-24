@@ -20,7 +20,7 @@ VersionManager.disabled = true;
 
 -- True if data sync was detected with a later version.
 VersionManager.newDetectedVersion = false;
-VersionManager.latestFormatVersion = 5;
+VersionManager.latestFormatVersion = 6;
 
 -- TODO: Fix & Validate this function
 -- Compare two version strings. Returns -1 if version is lower, 0 if equal, 1 if higher.
@@ -95,6 +95,7 @@ function VersionManager:OnInit()
             local match = ArenaAnalyticsDB[i];
             if(match) then
                 ArenaMatch:RecomputeShuffleDurations(match);
+                ArenaMatch:RecomputeShuffleOutcome(match);
             end
         end
 

@@ -282,7 +282,7 @@ function Internal:LookupClassID(class)
 end
 
 function Internal:GetAddonClassID(class)
-    if(class == nil) then
+    if(class == nil or API:IsSecretValue(class)) then
         return nil;
     end
 

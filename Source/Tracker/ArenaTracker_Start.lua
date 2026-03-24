@@ -102,6 +102,12 @@ function ArenaTracker:HandleArenaStart(stateData)
 	ArenaTracker:SetState("Active");
 	Events:RegisterArenaEvents();
 
+	-- initialize shuffle debug log so events are captured from match start, even if no rounds commit
+	--if(ArenaTracker:IsShuffle()) then
+	--	ArenaAnalyticsDevData = ArenaAnalyticsDevData or {};
+	--	ArenaAnalyticsDevData.shuffleDebugLog = {events = {}, rounds = {}, t = time()};
+	--end
+
 	-- End immediately
 	if(API:GetWinner() ~= nil) then
 		ArenaTracker:HandleArenaEnd(); -- TODO: Consider 1 frame delay?

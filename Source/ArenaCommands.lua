@@ -169,6 +169,55 @@ function Commands.HandleCommand_Test(...)
 	print(" ");
 	ArenaAnalytics:Print("================================================ ");
 
+	local currentArena = ArenaAnalyticsTransientDB and ArenaAnalyticsTransientDB.currentArena;
+	if(not currentArena) then
+		ArenaAnalytics:Print("No transient arena data.");
+		ArenaAnalytics:Print("================================================ ");
+		return;
+	end
+
+	ArenaAnalytics:Print("Tracking state:", ArenaTracker:GetStateName(), "  IsShuffle:", ArenaTracker:IsShuffle());
+	ArenaAnalytics:Print("IsArenaPreparation:", API:IsArenaPreparation());
+	ArenaAnalytics:Print("IsTrackingArena:", ArenaTracker:IsTrackingArena());
+
+	-- Current round
+	local round = currentArena.round;
+	local elapsed = round and round.startTime and (time() - round.startTime) or nil;
+	ArenaAnalytics:Print("Round hasStarted:", round and round.hasStarted, "  elapsed:", elapsed and (elapsed .. "s") or "nil");
+	ArenaAnalytics:Print("Round team size:", round and round.team and #round.team or "nil",
+		"  wins:", round and round.wins, "/", round and round.totalWins);
+
+	-- Committed rounds
+	local committed = currentArena.committedRounds;
+	local numCommitted = committed and #committed or 0;
+	ArenaAnalytics:Print("Committed rounds:", numCommitted);
+	for i, r in ipairs(committed or {}) do
+		local outcome = r.outcome == 1 and "Win" or (r.outcome == 0 and "Loss" or (r.outcome == 2 and "Draw" or "?"));
+		ArenaAnalytics:Print("  Round", i, "- duration:", r.duration and (r.duration .. "s") or "nil", "  outcome:", outcome,
+			"  team:", r.team and #r.team or 0, "  enemy:", r.enemy and #r.enemy or 0);
+	end
+
+	-- Death data
+	local deathData = ArenaTracker:GetDeathData();
+	local deathCount = 0;
+	for _ in pairs(deathData or {}) do deathCount = deathCount + 1; end
+	ArenaAnalytics:Print("Death entries:", deathCount);
+	for key, data in pairs(deathData or {}) do
+		local keyStr = API:IsSecretValue(key) and "SECRET" or tostring(key):sub(1, 20);
+		ArenaAnalytics:Print("  death:", keyStr, "->", data and data.name or "nil");
+	end
+
+	-- Unit token states
+	ArenaAnalytics:Print("Unit tokens:");
+	for _, token in ipairs({"player", "party1", "party2", "arena1", "arena2", "arena3"}) do
+		local isDead = UnitIsDeadOrGhost(token);
+		local tokenName = API:GetUnitFullName(token);
+		local nameStr = tokenName == nil and "nil" or (API:IsSecretValue(tokenName) and "SECRET" or tokenName);
+		local ok, tokenGUID = pcall(UnitGUID, token);
+		local guidStr = (not ok or tokenGUID == nil) and "nil" or (API:IsSecretValue(tokenGUID) and "SECRET" or tostring(tokenGUID):sub(1, 20));
+		ArenaAnalytics:Print(" ", token .. ":", isDead and "DEAD" or "alive", " name:", nameStr, " GUID:", guidStr);
+	end
+
 	ArenaAnalytics:Print("================================================ ");
 end
 

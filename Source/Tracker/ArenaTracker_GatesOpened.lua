@@ -62,22 +62,48 @@ function ArenaTracker:HandleArenaGatesOpened(...)
 	local isShuffle = ArenaTracker:IsTrackingShuffle();
 	Debug:LogGreen("ArenaTracker:HandleArenaGatesOpened() triggered! IsShuffle:", isShuffle);
 
-	currentArena.startTime = time();
-	currentArena.hasRealStartTime = true; -- The start time has been set by gates opened
+	-- Only set the overall match start time once (first round gates open)
+	if(not currentArena.hasRealStartTime) then
+		currentArena.startTime = time();
+		currentArena.hasRealStartTime = true;
+	end
 
-	ArenaTracker:FillMissingPlayers();
-	ArenaTracker:ForceTeamsUpdate();
-	ArenaTracker:UpdateRoundTeam();
-
+	-- Initialize shuffle round data before ForceTeamsUpdate (which calls CheckRoundEnded).
 	if(isShuffle) then
-		local myWins, totalWins = ArenaTracker:GetCurrentWins();
-		currentArena.round.wins = myWins;
-		currentArena.round.totalWins = totalWins;
-		Debug:Log("Assigned round wins:", myWins, totalWins);
+		-- Only set the win baseline for the first round (when nil).
+		-- In Midnight the scoreboard is unavailable during prep and returns 0, which would
+		-- overwrite the correct baseline CommitCurrentRound stored at the end of the prior round,
+		-- making every round after the first win appear as a win (myWins cumulative > reset-to-0).
+		if(currentArena.round.wins == nil) then
+			local myWins, totalWins = ArenaTracker:GetCurrentWins();
+			currentArena.round.wins = myWins or 0;
+			currentArena.round.totalWins = totalWins or 0;
+		end
+		Debug:Log("Round wins baseline:", currentArena.round.wins, currentArena.round.totalWins);
 
 		currentArena.round.startTime = time();
 		currentArena.round.hasStarted = true;
 	end
+
+	-- snapshot arena token names while they're still readable; names become secret mid-round
+	if(API.hasSecrets) then
+		currentArena.round.tokenNames = TablePool:Acquire();
+		for i = 1, 3 do
+			local token = "arena" .. i;
+			local name = API:GetUnitFullName(token);
+			if(API:IsValidValue(name)) then
+				currentArena.round.tokenNames[token] = name;
+			end
+		end
+
+		currentArena.round.pollLog = {};
+		ArenaTracker:ResetPollDeadState();
+		ArenaTracker:StartEnemyDeathPoll(); -- no-op if already running; only starts once per match
+	end
+
+	ArenaTracker:FillMissingPlayers();
+	ArenaTracker:ForceTeamsUpdate();
+	ArenaTracker:UpdateRoundTeam();
 
 	Debug:Log("Match started!", API:GetCurrentMapID(), GetZoneText(), #currentArena.players);
 end

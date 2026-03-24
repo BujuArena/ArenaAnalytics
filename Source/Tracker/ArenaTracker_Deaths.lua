@@ -67,23 +67,97 @@ function ArenaTracker:TryRemoveFromDeaths(playerGUID, spell)
 end
 
 
+-- Called via UNIT_HEALTH unit events; detects deaths mid-round since UNIT_DIED doesn't fire in Midnight.
+function ArenaTracker:HandleUnitHealth(unit)
+	if(not ArenaTracker:IsTrackingShuffle()) then return end
+	if(not UnitIsDeadOrGhost(unit)) then return end
+
+	-- UnitIsFeignDeath is only valid for friendly units; skip feign death for party tokens
+	if(UnitIsFeignDeath and UnitIsFeignDeath(unit) and not unit:find("^arena")) then return end
+
+	local guid = Helpers:UnitGUID(unit);
+	local name = API:GetUnitFullName(unit);
+
+	-- Use GUID as key if non-secret, else fall back to name
+	local key = (guid and not API:IsSecretValue(guid)) and guid or nil;
+	if(key == nil) then
+		key = (name and not API:IsSecretValue(name)) and name or nil;
+	end
+
+	-- fallback: use the token→name snapshot captured at gates open, before names went secret
+	if(key == nil and currentArena.round and currentArena.round.tokenNames) then
+		local snapshotName = currentArena.round.tokenNames[unit];
+		if(snapshotName) then
+			key = snapshotName;
+			name = snapshotName;
+			Debug:Log("HandleUnitHealth: resolved dead unit via gates-open snapshot:", unit, name);
+		end
+	end
+
+	if(key == nil) then
+		Debug:Log("HandleUnitHealth: no valid key for dead unit:", unit);
+		return;
+	end
+
+	Debug:Log("HandleUnitHealth: dead unit detected:", unit, name);
+	ArenaTracker:HandlePlayerDeath(key, false, name);
+end
+
+
 -- Handle a player's death, through death or kill credit message
-function ArenaTracker:HandlePlayerDeath(playerGUID, isKillCredit)
+-- hintName: optional destName from combat log, used as fallback when GUID lookup fails (e.g. Midnight secrets)
+function ArenaTracker:HandlePlayerDeath(playerGUID, isKillCredit, hintName)
 	if(playerGUID == nil) then
 		Debug:LogWarning("HandlePlayerDeath called with invalid GUID.");
 		return;
 	end
 
 	local name, realm, class, race, isFemale = API:GetPlayerInfoByGUID(playerGUID);
+
+	-- In Midnight, enemy GUIDs may be secret; GetPlayerInfoByGUID returns nil.
+	-- Fall back to destName from the combat log if it's a valid (non-secret) string.
+	if(name == nil and API:IsValidValue(hintName)) then
+		name = hintName;
+	end
+
+	-- Last resort: scan arena/party unit tokens for a newly dead player.
+	-- In Midnight, both destGUID and destName may be secret; unit tokens are still accessible.
+	-- Party member names ("party1"/"party2") are always readable; enemy names ("arena1"-"arena3") may still be secret.
+	if(name == nil) then
+		for _, token in ipairs({"player", "party1", "party2", "arena1", "arena2", "arena3"}) do
+			if(UnitIsDeadOrGhost(token)) then
+				local tokenName = API:GetUnitFullName(token);
+				if(API:IsValidValue(tokenName)) then
+					name = tokenName;
+					if(class == nil) then
+						local _, tokenClass = UnitClass(token);
+						class = API:IsValidValue(tokenClass) and tokenClass or nil;
+					end
+					Debug:Log("HandlePlayerDeath: identified dead player via unit token:", token, name);
+					break;
+				end
+			end
+		end
+	end
+
 	if(name == nil or name == "") then
 		Debug:LogError("Invalid name of dead player. Skipping..");
 		return;
 	end
 
 	if(not realm or realm == "") then
+		-- GetUnitFullName already returns "Name-Realm"; ToFullName handles both formats.
 		name = API:ToFullName(name);
 	else
 		name = name .. "-" .. realm;
+	end
+
+	-- resolve class from tracked player data when GUID lookup failed (e.g. snapshot-name keys from poll)
+	if(class == nil and name) then
+		local player = ArenaTracker:GetPlayer(name);
+		if(player) then
+			class = player.class;
+		end
 	end
 
 	Debug:LogGreen("Player Kill!", isKillCredit, name);

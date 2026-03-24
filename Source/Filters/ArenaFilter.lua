@@ -422,7 +422,7 @@ local function SafeIncrement(table, key, delta)
 end
 
 local lastIndex = nil;
-local function findOrAddCompValues(compsTable, comp, isWin, mmr, isEnemy)
+local function findOrAddCompValues(compsTable, comp, isDraw, isWin, mmr, isEnemy)
     assert(compsTable);
     if comp == nil then
         return;
@@ -434,8 +434,10 @@ local function findOrAddCompValues(compsTable, comp, isWin, mmr, isEnemy)
     -- Played
     SafeIncrement(compData, "played");
 
-    -- Win count
-    if isWin then
+    -- Win/draw count
+    if isDraw then
+        SafeIncrement(compData, "draws");
+    elseif isWin then
         SafeIncrement(compData, "wins");
     end
 
@@ -452,14 +454,15 @@ local function AddToCompData(match, isEnemyTeam, index)
     transientCompData[compKey] = transientCompData[compKey] or TablePool:Acquire();
 
     local function AddData(comp, outcome, mmr)
+        local isDraw = (outcome == 2);
         local isWin = (outcome == 1);
 
         -- Add to "All" data
-        findOrAddCompValues(transientCompData[compKey], "All", isWin, mmr);
+        findOrAddCompValues(transientCompData[compKey], "All", isDraw, isWin, mmr);
 
         -- Add comp specific data
         if(comp ~= nil) then
-            findOrAddCompValues(transientCompData[compKey], comp, isWin, mmr, isEnemyTeam);
+            findOrAddCompValues(transientCompData[compKey], comp, isDraw, isWin, mmr, isEnemyTeam);
         end
     end
 
@@ -487,7 +490,8 @@ local function FinalizeCompDataTables()
                 -- Calculate winrate
                 local played = tonumber(compTable.played) or 0;
                 local wins = tonumber(compTable.wins) or 0;
-                compTable.winrate = Helpers:GetSafePercentage(wins, played, 3); -- Keep 3 decimals for sorting accuracy. (Rounded by UI)
+                local draws = tonumber(compTable.draws) or 0;
+                compTable.winrate = Helpers:GetSafePercentage(wins, played - draws, 3); -- Keep 3 decimals for sorting accuracy. (Rounded by UI)
 
                 -- Calculate average MMR
                 local mmr = tonumber(compTable.mmr);

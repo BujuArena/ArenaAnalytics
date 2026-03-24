@@ -587,6 +587,44 @@ function ArenaMatch:SetMatchOutcome(match, value)
     match[matchKeys.outcome] = ToNumericalOutcome(value, 2);
 end
 
+-- recalculate match outcome for shuffles based on completed (non-draw) rounds;
+-- handles incomplete shuffles where someone left early
+function ArenaMatch:RecomputeShuffleOutcome(match)
+    if(not ArenaMatch:IsShuffle(match)) then
+        return;
+    end
+
+    local rounds = ArenaMatch:GetRounds(match);
+    if(not rounds or #rounds == 0) then
+        return;
+    end
+
+    local wins, completedRounds = 0, 0;
+    for _, round in ipairs(rounds) do
+        local _, _, _, _, outcome = ArenaMatch:GetRoundData(round);
+        if(outcome == 1) then
+            wins = wins + 1;
+            completedRounds = completedRounds + 1;
+        elseif(outcome == 0) then
+            completedRounds = completedRounds + 1;
+        end
+    end
+
+    if(completedRounds == 0) then
+        ArenaMatch:SetMatchOutcome(match, 2);
+        return;
+    end
+
+    local half = completedRounds / 2;
+    if(wins == half) then
+        ArenaMatch:SetMatchOutcome(match, 2);
+    elseif(wins > half) then
+        ArenaMatch:SetMatchOutcome(match, 1);
+    else
+        ArenaMatch:SetMatchOutcome(match, 0);
+    end
+end
+
 -------------------------------------------------------------------------
 -- Team (17)
 

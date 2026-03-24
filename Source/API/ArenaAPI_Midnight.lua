@@ -15,9 +15,10 @@ local Debug = ArenaAnalytics.Debug;
 -------------------------------------------------------------------------
 
 API.disableTracking = false; -- Nuclear option: Midnight currently does not support tracking at all.
-API.disableShuffles = true;
+API.disableShuffles = false;
 
 API.hasSecrets = true;
+API.explicitPreparationID = { 32727 }; -- Only check Arena Preparation (32727); 44521 is a different spell in Midnight.
 API.defaultButtonTemplate = "UIPanelButtonTemplate";
 API.showPerPlayerRatedInfo = true;
 API.useThirdTooltipBackdrop = true;
@@ -125,9 +126,9 @@ function API:GetPlayerScore(index)
         end
     end
 
-    -- MMR
-    local oldMMR = tonumber(scoreInfo.prematchMMR);
-    local newMMR = tonumber(scoreInfo.postmatchMMR);
+    -- MMR (prematchMMR/postmatchMMR are secret numbers in Midnight; guard before arithmetic)
+    local oldMMR = API:IsValidValue(scoreInfo.prematchMMR) and tonumber(scoreInfo.prematchMMR) or nil;
+    local newMMR = API:IsValidValue(scoreInfo.postmatchMMR) and tonumber(scoreInfo.postmatchMMR) or nil;
     if(oldMMR and oldMMR > 0) then
         score.mmr = oldMMR;
 
